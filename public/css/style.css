@@ -1,0 +1,55 @@
+body {
+  display: flex;
+  min-height: 100vh;
+  
+}
+
+
+.sidebar {
+  width: 250px;
+  background-color: #343a40;
+  color: #fff;
+}
+
+.sidebar .sidebar-link {
+  color: #adb5bd;
+  padding: 10px 20px;
+  display: block;
+  text-decoration: none;
+}
+
+.sidebar .sidebar-link:hover {
+  background-color: #495057;
+  color: #fff;
+}
+
+.sidebar .sidebar-dropdown {
+  padding-left: 20px;
+}
+
+table td, table th {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar .nav-link {
+  background-color: transparent;
+  border-radius: 4px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.sidebar .nav-link:hover {
+  background-color: #495057;
+  color: #fff;
+}
+
+.sidebar .nav-link.active {
+  background-color: #0d6efd;
+  color: #fff;
+}
+
+input[type="datetime-local"] {
+  pointer-events: auto !important;
+  z-index: 2;
+}

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Kullanıcıyı Deaktife Et</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="/js/layout.js" defer></script>
+  <style>
+    body {
+      background-color: #f8f9fa;
+    }
+    .sidebar-wrapper {
+      display: flex;
+    }
+    .sidebar {
+      min-width: 250px;
+      background-color: #f1f1f1;
+    }
+    .main-content {
+      flex-grow: 1;
+      padding: 40px;
+    }
+    .step {
+      display: none;
+    }
+    .step.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+<div class="sidebar-wrapper">
+  <div id="sidebar" class="sidebar"></div>
+
+  <div class="main-content">
+    <h2>Kullanıcıyı Deaktife Et</h2>
+
+    <!-- Adım 1: Kullanıcı Seçimi -->
+    <div class="step active" id="step1">
+      <h5>1. Hedef Kullanıcıyı Seçin</h5>
+      <input type="text" id="userSearch" class="form-control mb-3" placeholder="Kullanıcı ara...">
+      <select id="userSelect" class="form-select" size="8" style="height: auto;"></select>
+      <button class="btn btn-primary mt-3" onclick="nextStep()">İlerle</button>
+    </div>
+
+    <!-- Adım 2: Zamanlama -->
+    <div class="step" id="step2">
+      <h5>2. Tarih ve Saat Seçin</h5>
+      <input type="datetime-local" class="form-control" id="datetime" name="datetime" required>
+      <button class="btn btn-secondary mt-3 me-2" onclick="prevStep()">Geri</button>
+      <button class="btn btn-primary mt-3" onclick="nextStep()">İlerle</button>
+    </div>
+
+    <!-- Adım 3: Onay -->
+    <div class="step" id="step3">
+      <h5>3. Görev Özeti</h5>
+      <ul class="list-group mt-3">
+        <li class="list-group-item"><strong>Kullanıcı:</strong> <span id="summaryUser"></span></li>
+        <li class="list-group-item"><strong>Tarih/Saat:</strong> <span id="summaryTime"></span></li>
+      </ul>
+      <button class="btn btn-secondary mt-3 me-2" onclick="prevStep()">Geri</button>
+      <button class="btn btn-success mt-3" onclick="submitTask()">Görevi Oluştur</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentStep = 1;
+  let users = [];
+  let filteredUsers = [];
+
+  function showStep(n) {
+    document.querySelectorAll('.step').forEach((s, i) => {
+      s.classList.toggle('active', i === n - 1);
+    });
+  }
+
+  function nextStep() {
+    if (currentStep === 1 && !document.getElementById('userSelect').value) return;
+    if (currentStep === 2 && !document.getElementById('datetime').value) return;
+
+    currentStep++;
+    if (currentStep === 3) fillSummary();
+    showStep(currentStep);
+  }
+
+  function prevStep() {
+    if (currentStep > 1) currentStep--;
+    showStep(currentStep);
+  }
+
+  function fillSummary() {
+    const userText = document.getElementById('userSelect').selectedOptions[0].textContent;
+    const time = new Date(document.getElementById('datetime').value).toLocaleString('tr-TR');
+
+    document.getElementById('summaryUser').textContent = userText;
+    document.getElementById('summaryTime').textContent = time;
+  }
+
+  async function loadUsers() {
+    const res = await fetch('/users');
+    users = await res.json();
+    filteredUsers = users;
+    renderUserOptions();
+  }
+
+  function renderUserOptions() {
+    const select = document.getElementById('userSelect');
+    select.innerHTML = "";
+    filteredUsers.forEach(user => {
+      const option = document.createElement("option");
+      option.value = user.username;
+      option.textContent = `${user.name} (${user.username})`;
+      select.appendChild(option);
+    });
+  }
+
+  document.getElementById("userSearch").addEventListener("input", () => {
+    const val = document.getElementById("userSearch").value.toLowerCase();
+    filteredUsers = users.filter(u =>
+      u.name.toLowerCase().includes(val) ||
+      u.username.toLowerCase().includes(val) ||
+      u.email.toLowerCase().includes(val)
+    );
+    renderUserOptions();
+  });
+
+  async function submitTask() {
+    const payload = {
+      type: 'deactivate_user',
+      username: document.getElementById('userSelect').value,
+      runAt: document.getElementById('datetime').value
+    };
+
+    const res = await fetch('/api/schedule-task', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      alert('✅ Görev başarıyla oluşturuldu!');
+      window.location.href = '/active_tasks.html';
+    } else {
+      alert('❌ Görev oluşturulamadı.');
+    }
+  }
+
+  // Destekleyen tarayıcılarda tıklayınca picker'ı zorla göster
+  document.getElementById('datetime').addEventListener('click', function () {
+    this.showPicker && this.showPicker();
+  });
+
+  loadUsers();
+  showStep(currentStep);
+</script>
+
+</body>
+</html>

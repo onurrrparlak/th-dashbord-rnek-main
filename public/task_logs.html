@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Görev Geçmişi</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="/js/layout.js" defer></script>
+  <style>
+    body {
+      background-color: #f8f9fa;
+    }
+
+    .sidebar-wrapper {
+      display: flex;
+    }
+
+    .sidebar {
+      min-width: 250px;
+      background-color: #f1f1f1;
+    }
+
+    .main-content {
+      flex-grow: 1;
+      padding: 40px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="sidebar-wrapper">
+  <div id="sidebar" class="sidebar"></div>
+
+  <div class="main-content">
+    <h2>Görev Geçmişi</h2>
+    <table class="table table-striped mt-4">
+      <thead>
+        <tr>
+          <th>Kullanıcı</th>
+          <th>İşlem</th>
+          <th>Durum</th>
+          <th>Tarih</th>
+          <th>Mesaj</th>
+        </tr>
+      </thead>
+      <tbody id="logTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  async function loadLogs() {
+    const res = await fetch('/api/task-logs');
+    const logs = await res.json();
+    const tbody = document.getElementById('logTableBody');
+
+    logs.reverse().forEach(log => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${log.username}</td>
+        <td>${formatTaskType(log.type)}</td>
+        <td>${log.status === 'success' ? '✅ Başarılı' : '❌ Hata'}</td>
+        <td>${new Date(log.timestamp).toLocaleString('tr-TR')}</td>
+        <td>${log.message}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function formatTaskType(type) {
+    if (type === 'activate_user') return '🟢 Kullanıcıyı Aktif Et';
+    if (type === 'deactivate_user') return '🛑 Kullanıcıyı Deaktif Et';
+    return type;
+  }
+
+  loadLogs();
+</script>
+</body>
+</html>

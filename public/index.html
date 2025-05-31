@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>AD Yönetim Paneli</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+  <div class="d-flex" id="wrapper">
+    <!-- Sidebar -->
+    <div class="bg-dark border-end" id="sidebar-wrapper">
+      <div class="sidebar-heading text-white p-3"><i class="fas fa-network-wired"></i> AD Panel</div>
+      <div class="list-group list-group-flush">
+        <a href="users.html" class="list-group-item list-group-item-action bg-dark text-white">
+          <i class="fas fa-users me-2"></i> Kullanıcılar
+        </a>
+        <a class="list-group-item list-group-item-action bg-dark text-white" data-bs-toggle="collapse" href="#menuBilgisayarlar" role="button">
+          <i class="fas fa-desktop me-2"></i> Bilgisayarlar
+        </a>
+        <div class="collapse ps-4" id="menuBilgisayarlar">
+          <a href="#" class="list-group-item list-group-item-action bg-dark text-white">Tüm Bilgisayarlar</a>
+          <a href="#" class="list-group-item list-group-item-action bg-dark text-white">Yeni Bilgisayar</a>
+        </div>
+        <a class="list-group-item list-group-item-action bg-dark text-white" data-bs-toggle="collapse" href="#menuImaj" role="button">
+          <i class="fas fa-image me-2"></i> İmaj
+        </a>
+        <div class="collapse ps-4" id="menuImaj">
+          <a href="#" class="list-group-item list-group-item-action bg-dark text-white">İmaj Listesi</a>
+          <a href="#" class="list-group-item list-group-item-action bg-dark text-white">Yeni Yükle</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Page Content -->
+    <div id="page-content-wrapper" class="w-100">
+      <div class="container-fluid py-4">
+        <h1 class="fw-bold">Hoş geldiniz</h1>
+        <p>Sol menüden işlemlerinizi seçin.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
