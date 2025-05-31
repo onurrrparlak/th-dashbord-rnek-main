@@ -1,0 +1,34 @@
+[
+  {
+    "username": "testuser16",
+    "type": "activate_user",
+    "status": "success",
+    "timestamp": "2025-05-31T16:38:00.040Z",
+    "message": "Aktif edildi",
+    "label": "Test User16 (testuser16)"
+  },
+  {
+    "username": "testuser11",
+    "type": "deactivate_user",
+    "status": "success",
+    "timestamp": "2025-05-31T16:42:00.040Z",
+    "message": "Deaktif edildi",
+    "label": "Test User11 (testuser11)"
+  },
+  {
+    "username": "testuser10",
+    "type": "deactivate_user",
+    "status": "error",
+    "timestamp": "2025-05-31T16:46:00.043Z",
+    "message": "Not Allowed On Rdn",
+    "label": "Test User10 (testuser10)"
+  },
+  {
+    "username": "testuser1",
+    "type": "deactivate_user",
+    "status": "success",
+    "timestamp": "2025-05-31T16:51:00.046Z",
+    "message": "Deaktif edildi",
+    "label": "Test User1 (testuser1)"
+  }
+]

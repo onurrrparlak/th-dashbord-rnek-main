@@ -5,6 +5,11 @@ const bodyParser = require('body-parser');
 const schedule = require('node-schedule');
 const ActiveDirectory = require('activedirectory2');
 const { v4: uuidv4 } = require('uuid');
+const ldap = require('ldapjs');
+const fs = require('fs');
+const LOG_FILE = path.join(__dirname, '..', 'public', 'logs', 'task_logs.json');
+
+
 const { Change, Attribute } = require('ldapjs');
 
 
@@ -23,6 +28,8 @@ const config = {
 const ad = new ActiveDirectory(config);
 
 let cachedUsers = null;
+let logs = [];
+
 let lastFetchTime = 0;
 const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 dakika
 
@@ -80,6 +87,13 @@ app.get('/users', (req, res) => {
   });
 });
 
+// Kullanıcı cache'ini temizle ve AD'den yeniden çek
+app.post('/api/refresh-users-cache', (req, res) => {
+  cachedUsers = null;
+  lastFetchTime = 0;
+  res.json({ success: true, message: 'Kullanıcı cache\'i temizlendi. Bir sonraki /users isteğinde güncel veriler çekilecek.' });
+});
+
 
 
 app.get('/users/:username', (req, res) => {
@@ -118,43 +132,28 @@ app.get('/users/:username', (req, res) => {
 
 let scheduledTasks = [];
 
-const logs = []; // ⬅️ EKLE
+try {
+  if (fs.existsSync(LOG_FILE)) {
+    const data = fs.readFileSync(LOG_FILE, 'utf8');
+    logs = JSON.parse(data);
+  }
+} catch (err) {
+  console.error('Log dosyası okunamadı:', err);
+}
+
+// Log ekleme fonksiyonu
 function addLog(entry) {
   logs.push(entry);
-}
-
-const ldap = require('ldapjs');
-
-function enableUserDN(dn, callback) {
-  const client = ldap.createClient({ url: process.env.AD_URL });
-
-  client.bind(process.env.AD_USERNAME, process.env.AD_PASSWORD, (err) => {
-    if (err) {
-      console.error('❌ LDAP bind hatası:', err);
-      return callback(err);
-    }
-
-    const attribute = new Attribute({
-      type: 'userAccountControl',
-      values: ['512']
-    });
-
-    const change = new Change({
-      operation: 'replace',
-      modification: attribute
-    });
-
-    client.modify(dn, change, (err) => {
-      if (err) {
-        console.error('❌ Kullanıcı aktif etme hatası:', err);
-        return callback(err);
-      }
-
-      console.log('✅ Kullanıcı aktif hale getirildi:', dn);
-      callback(null);
-    });
+  // Dosyaya kaydet
+  fs.writeFile(LOG_FILE, JSON.stringify(logs, null, 2), err => {
+    if (err) console.error('Log dosyası yazılamadı:', err);
   });
 }
+
+// API logları JSON'dan döndürür
+app.get('/api/task-logs', (req, res) => {
+  res.json(logs);
+});
 
 
 
@@ -182,8 +181,12 @@ app.post('/api/schedule-task', (req, res) => {
   const date = new Date(runAt);
   const id = uuidv4();
 
-  const job = schedule.scheduleJob(date, () => {
-    const dn = `CN=${username},${process.env.AD_USER_DN}`;
+ const job = schedule.scheduleJob(date, () => {
+  getUserDN(username, (err, dn) => {
+    if (err) {
+      addLog({ username, type, status: 'error', timestamp: new Date(), message: err.message, label });
+      return;
+    }
 
     if (type === 'activate_user') {
       enableUserDN(dn, (err) => {
@@ -194,7 +197,7 @@ app.post('/api/schedule-task', (req, res) => {
         }
       });
     } else if (type === 'deactivate_user') {
-      disableUserDN(dn, (err) => {
+     disableUserDN(dn, (err) => {
         if (err) {
           addLog({ username, type, status: 'error', timestamp: new Date(), message: err.message, label });
         } else {
@@ -203,6 +206,8 @@ app.post('/api/schedule-task', (req, res) => {
       });
     }
   });
+});
+
 
   scheduledTasks.push({
     id,
@@ -220,8 +225,169 @@ app.get('/api/task-logs', (req, res) => {
   res.json(logs);
 });
 
+function getUserDN(username, callback) {
+  const opts = {
+    filter: `(&(objectCategory=person)(objectClass=user)(sAMAccountName=${username}))`,
+    attributes: ['distinguishedName']
+  };
+  ad.find(opts, (err, results) => {
+    if (err) return callback(err);
+    if (!results.users || results.users.length === 0) return callback(new Error('Kullanıcı bulunamadı'));
+
+    const user = results.users[0];
+    const dn = user.distinguishedName || user.dn;
+
+    if (!dn) return callback(new Error('DN bilgisi yok'));
+
+    console.log('Bulunan DN:', dn);
+    callback(null, dn);
+  });
+}
 
 
+function disableUserDN(dn, callback) {
+  const client = ldap.createClient({
+    url: process.env.AD_URL
+  });
+
+  client.bind(process.env.AD_USERNAME, process.env.AD_PASSWORD, (err) => {
+    if (err) return callback(err);
+
+    // Önce userAccountControl al
+    const opts = {
+      scope: 'base',
+      attributes: ['userAccountControl', 'cn']
+    };
+
+    client.search(dn, opts, (err, res) => {
+      if (err) {
+        client.unbind();
+        return callback(err);
+      }
+
+      let userAccountControl;
+      let currentCN;
+
+      res.on('searchEntry', (entry) => {
+        userAccountControl = entry.attributes.find(attr => attr.type === 'userAccountControl')?.values[0];
+        currentCN = entry.attributes.find(attr => attr.type === 'cn')?.values[0];
+      });
+
+      res.on('error', (err) => {
+        client.unbind();
+        callback(err);
+      });
+
+      res.on('end', () => {
+        if (userAccountControl === undefined) {
+          client.unbind();
+          return callback(new Error('userAccountControl bulunamadı'));
+        }
+        if (!currentCN) {
+          client.unbind();
+          return callback(new Error('cn bilgisi bulunamadı'));
+        }
+
+        let uac = parseInt(userAccountControl);
+        uac = uac | 2; // Disable flag'i ekle
+
+        // userAccountControl değişikliğini uygula
+        const change = new Change({
+          operation: 'replace',
+          modification: new Attribute({
+            type: 'userAccountControl',
+            values: [uac.toString()]
+          })
+        });
+
+        client.modify(dn, change, (err) => {
+          if (err) {
+            client.unbind();
+            return callback(err);
+          }
+
+          // RDN değişikliği için yeni RDN hazırla
+          let newCN = currentCN.startsWith('v-') ? currentCN : 'v-' + currentCN;
+
+          // DN içinden RDN çıkar (örn: CN=John Doe,... -> CN=John Doe)
+          const rdn = `CN=${currentCN}`;
+          const newRdn = `CN=${newCN}`;
+
+          client.modifyDN(dn, newRdn, (err) => {
+            client.unbind();
+            if (err) return callback(err);
+            callback(null);
+          });
+        });
+      });
+    });
+  });
+}
+
+
+
+function enableUserDN(dn, callback) {
+  const client = ldap.createClient({
+    url: process.env.AD_URL
+  });
+
+  client.bind(process.env.AD_USERNAME, process.env.AD_PASSWORD, (err) => {
+    if (err) {
+      return callback(err);
+    }
+
+    const opts = {
+      scope: 'base',
+      attributes: ['userAccountControl']
+    };
+
+    client.search(dn, opts, (err, res) => {
+      if (err) {
+        client.unbind();
+        return callback(err);
+      }
+
+      let userAccountControl;
+
+      res.on('searchEntry', (entry) => {
+        userAccountControl = entry.attributes.find(attr => attr.type === 'userAccountControl')?.values[0];
+      });
+
+      res.on('error', (err) => {
+        client.unbind();
+        callback(err);
+      });
+
+      res.on('end', () => {
+        if (userAccountControl === undefined) {
+          client.unbind();
+          return callback(new Error('userAccountControl bulunamadı'));
+        }
+
+        let uac = parseInt(userAccountControl);
+        uac = uac & (~2);  // Disable flag'i kaldır
+
+        const mod = new Attribute({
+          type: 'userAccountControl',
+          values: [uac.toString()]
+        });
+
+        const change = new Change({
+          operation: 'replace',
+          modification: mod
+        });
+
+        client.modify(dn, change, (err) => {
+          client.unbind();
+          if (err) {
+            return callback(err);
+          }
+          callback(null);
+        });
+      });
+    });
+  });
+}
 
 
 

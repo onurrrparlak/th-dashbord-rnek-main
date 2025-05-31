@@ -1,79 +1,86 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Aktif Görevler</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="/css/style.css" rel="stylesheet" />
   <script src="/js/layout.js" defer></script>
-  <style>
-    body { background-color: #f8f9fa; }
-    .sidebar-wrapper { display: flex; }
-    .sidebar { min-width: 250px; background-color: #f1f1f1; }
-    .main-content { flex-grow: 1; padding: 40px; }
-    .table-container {
-      background-color: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-  </style>
 </head>
+
 <body>
+  <div id="sidebar-placeholder"></div> <!-- Sidebar JS ile yüklenecek -->
 
-<div class="sidebar-wrapper">
-  <div id="sidebar" class="sidebar"></div>
+  <main class="main-content">
+    <h2 class="mb-4">Aktif Görevler</h2>
 
-  <div class="main-content">
-    <h2>Aktif Görevler</h2>
-    <div class="table-container mt-4">
+    <div class="table-container">
       <table class="table table-striped">
         <thead>
           <tr>
             <th>Görev Adı</th>
             <th>Cron</th>
             <th>Açıklama</th>
-            <th>Durum</th>
+            <th>Çalışma Zamanı</th>
           </tr>
         </thead>
         <tbody id="taskTableBody">
-          <!-- JavaScript ile doldurulacak -->
+          <tr>
+            <td colspan="4" class="text-center">Yükleniyor...</td>
+          </tr>
         </tbody>
       </table>
     </div>
-  </div>
-</div>
+  </main>
 
-<script>
-  async function loadActiveTasks() {
-    const res = await fetch('/api/active-tasks');
-    const tasks = await res.json();
-    const tbody = document.getElementById('taskTableBody');
+  <script>
+    // Sidebar'ı ilk sayfadaki gibi yükle
+    fetch('/sidebar.html')
+      .then(res => res.text())
+      .then(html => {
+        document.getElementById('sidebar-placeholder').innerHTML = html;
+      })
+      .catch(console.error);
 
-    if (tasks.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4">Aktif görev bulunmamaktadır.</td></tr>';
-      return;
+    async function loadActiveTasks() {
+      const res = await fetch('/api/active-tasks');
+      const tbody = document.getElementById('taskTableBody');
+      if (!res.ok) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Görevler yüklenemedi.</td></tr>';
+        return;
+      }
+      const tasks = await res.json();
+      tbody.innerHTML = '';
+
+      if (tasks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center">Aktif görev bulunmamaktadır.</td></tr>';
+        return;
+      }
+
+      tasks.forEach(task => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${formatTaskType(task.type)}</td>
+          <td>${task.cron || '-'}</td>
+          <td>${task.description || ''}</td>
+          <td>${task.runAt ? new Date(task.runAt).toLocaleString('tr-TR') : '-'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
     }
 
-    tasks.forEach(task => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${formatTaskType(task.type)}</td>
-        <td>${task.cron || '-'}</td>
-        <td>${task.description || ''}</td>
-        <td>${new Date(task.runAt).toLocaleString('tr-TR')}</td>
-      `;
-      tbody.appendChild(tr);
+    function formatTaskType(type) {
+      if (type === 'activate_user') return '🟢 Kullanıcıyı Aktif Et';
+      if (type === 'deactivate_user') return '🛑 Kullanıcıyı Deaktif Et';
+      return type || '-';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadActiveTasks();
     });
-  }
-
-  function formatTaskType(type) {
-    if (type === 'activate_user') return '🟢 Kullanıcıyı Aktif Et';
-    if (type === 'deactivate_user') return '🛑 Kullanıcıyı Deaktif Et';
-    return type;
-  }
-
-  loadActiveTasks();
-</script>
-
+  </script>
 </body>
+
 </html>

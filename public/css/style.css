@@ -1,9 +1,8 @@
 body {
   display: flex;
   min-height: 100vh;
-  
+  background-color: #fff; /* Eklendi: tüm sayfalarda beyaz arka plan */
 }
-
 
 .sidebar {
   width: 250px;
@@ -27,7 +26,8 @@ body {
   padding-left: 20px;
 }
 
-table td, table th {
+table td,
+table th {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -52,4 +52,36 @@ table td, table th {
 input[type="datetime-local"] {
   pointer-events: auto !important;
   z-index: 2;
+}
+
+.main-content {
+  flex-grow: 1;
+  padding: 40px;
+}
+
+/* Yeni eklenen: Adım gösterme/gizleme için */
+.step {
+  display: none;
+}
+
+.step.active {
+  display: block;
+}
+
+/* input ve select elemanlarına ufak boşluklar */
+.form-control,
+.form-select {
+  max-width: 400px;
+}
+
+/* Butonlar ve container içi boşluklar */
+.main-content > * + * {
+  margin-top: 1.5rem;
+}
+
+.table-container {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgb(0 0 0 / 0.1);
 }

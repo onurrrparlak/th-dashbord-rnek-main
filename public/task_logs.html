@@ -1,36 +1,20 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Görev Geçmişi</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="/css/style.css" rel="stylesheet" />
   <script src="/js/layout.js" defer></script>
-  <style>
-    body {
-      background-color: #f8f9fa;
-    }
-
-    .sidebar-wrapper {
-      display: flex;
-    }
-
-    .sidebar {
-      min-width: 250px;
-      background-color: #f1f1f1;
-    }
-
-    .main-content {
-      flex-grow: 1;
-      padding: 40px;
-    }
-  </style>
+  <script src="/js/sidebar-loader.js" defer></script>
 </head>
+
 <body>
+  <div id="sidebar-placeholder"></div>
 
-<div class="sidebar-wrapper">
-  <div id="sidebar" class="sidebar"></div>
-
-  <div class="main-content">
+  <main class="main-content">
     <h2>Görev Geçmişi</h2>
     <table class="table table-striped mt-4">
       <thead>
@@ -44,35 +28,40 @@
       </thead>
       <tbody id="logTableBody"></tbody>
     </table>
-  </div>
-</div>
+  </main>
 
-<script>
-  async function loadLogs() {
-    const res = await fetch('/api/task-logs');
-    const logs = await res.json();
-    const tbody = document.getElementById('logTableBody');
+  <script>
+    async function loadLogs() {
+      const res = await fetch('/api/task-logs');
+      if (!res.ok) {
+        alert('Loglar yüklenemedi.');
+        return;
+      }
+      const logs = await res.json();
+      const tbody = document.getElementById('logTableBody');
+      tbody.innerHTML = '';
 
-    logs.reverse().forEach(log => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${log.username}</td>
-        <td>${formatTaskType(log.type)}</td>
-        <td>${log.status === 'success' ? '✅ Başarılı' : '❌ Hata'}</td>
-        <td>${new Date(log.timestamp).toLocaleString('tr-TR')}</td>
-        <td>${log.message}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-  }
+      logs.reverse().forEach(log => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${log.username || '-'}</td>
+          <td>${formatTaskType(log.type)}</td>
+          <td>${log.status === 'success' ? '✅ Başarılı' : '❌ Hata'}</td>
+          <td>${new Date(log.timestamp).toLocaleString('tr-TR')}</td>
+          <td>${log.message || ''}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
 
-  function formatTaskType(type) {
-    if (type === 'activate_user') return '🟢 Kullanıcıyı Aktif Et';
-    if (type === 'deactivate_user') return '🛑 Kullanıcıyı Deaktif Et';
-    return type;
-  }
+    function formatTaskType(type) {
+      if (type === 'activate_user') return '🟢 Kullanıcıyı Aktif Et';
+      if (type === 'deactivate_user') return '🛑 Kullanıcıyı Deaktif Et';
+      return type || '-';
+    }
 
-  loadLogs();
-</script>
+    loadLogs();
+  </script>
 </body>
+
 </html>

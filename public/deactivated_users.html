@@ -3,71 +3,49 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Deaktif Kullanıcılar</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="/css/style.css" rel="stylesheet" />
   <script src="/js/layout.js" defer></script>
-  <style>
-    body {
-      background-color: #f8f9fa;
-    }
-
-    .sidebar-wrapper {
-      display: flex;
-    }
-
-    .sidebar {
-      min-width: 250px;
-      background-color: #f1f1f1;
-    }
-
-    .main-content {
-      flex-grow: 1;
-      padding: 40px;
-    }
-
-    .table-container {
-      background-color: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-  </style>
+ 
 </head>
 
 <body>
+  <div id="sidebar-placeholder"></div>
 
-  <div class="sidebar-wrapper">
-    <div id="sidebar" class="sidebar"></div>
-
-    <div class="main-content">
-      <h2 class="mb-4">Deaktif Kullanıcılar</h2>
-
-      <div class="mb-3">
-        <input type="text" id="searchInput" class="form-control" placeholder="Kullanıcı arayın..." />
-      </div>
-
-      <div class="table-container">
-        <table class="table table-striped">
-          <thead>
-            <tr>
-              <th>İsim</th>
-              <th>Kullanıcı Adı</th>
-              <th>E-posta</th>
-              <th>İşlem</th>
-            </tr>
-          </thead>
-          <tbody id="userTableBody"></tbody>
-        </table>
-
-        <nav>
-          <ul class="pagination justify-content-center flex-wrap" id="pagination"></ul>
-        </nav>
-      </div>
-    </div>
+    <!-- Sidebar JS ile yüklenecek -->
   </div>
 
+  <main class="main-content">
+    <h2 class="mb-4">Deaktif Kullanıcılar</h2>
+
+    <div class="mb-3">
+      <input type="text" id="searchInput" class="form-control" placeholder="Kullanıcı arayın..." />
+    </div>
+
+    <div class="table-container">
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>İsim</th>
+            <th>Kullanıcı Adı</th>
+            <th>E-posta</th>
+            <th>İşlem</th>
+          </tr>
+        </thead>
+        <tbody id="userTableBody"></tbody>
+      </table>
+
+      <nav>
+        <ul class="pagination justify-content-center flex-wrap" id="pagination"></ul>
+      </nav>
+    </div>
+  </main>
+
   <script>
+  
+
     let allUsers = [];
     let deactivatedUsers = [];
     let currentPage = 1;
@@ -78,7 +56,6 @@
       const res = await fetch('/users');
       allUsers = await res.json();
       deactivatedUsers = allUsers.filter(user => user.disabled === true);
-
       renderTable();
     }
 
@@ -91,7 +68,7 @@
       );
 
       const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
-      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage > totalPages) currentPage = totalPages || 1;
 
       const start = (currentPage - 1) * usersPerPage;
       const end = start + usersPerPage;
@@ -104,13 +81,13 @@
         const row = document.createElement("tr");
 
         row.innerHTML = `
-       <td>${user.fullName || user.name}</td>
-        <td>${user.username}</td>
-        <td>${user.email}</td>
-        <td>
-          <a class="btn btn-sm btn-outline-primary" href="/user_details.html?username=${user.username}">Detay</a>
-        </td>
-      `;
+          <td>${user.fullName || user.name}</td>
+          <td>${user.username}</td>
+          <td>${user.email}</td>
+          <td>
+            <a class="btn btn-sm btn-outline-primary" href="/user_details.html?username=${user.username}">Detay</a>
+          </td>
+        `;
 
         tableBody.appendChild(row);
       });
@@ -173,8 +150,9 @@
     });
 
     fetchUsers();
+    
   </script>
-
+<script src="js/sidebar-loader.js"></script>
 </body>
 
 </html>

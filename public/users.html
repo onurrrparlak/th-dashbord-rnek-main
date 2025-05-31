@@ -2,42 +2,18 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Kullanıcılar</title>
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-  />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="/css/style.css" rel="stylesheet" /> <!-- Referans sayfadaki gibi yerel css -->
   <script src="/js/layout.js" defer></script>
-  <style>
-    body {
-      background-color: #f8f9fa;
-    }
-    .sidebar-wrapper {
-      display: flex;
-    }
-    .sidebar {
-      min-width: 250px;
-      background-color: #f1f1f1;
-    }
-    .main-content {
-      flex-grow: 1;
-      padding: 40px;
-    }
-    .table-container {
-      background-color: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-  </style>
+  <script src="/js/sidebar-loader.js" defer></script> <!-- Sidebar yükleme scripti -->
 </head>
 <body>
 
-<div class="sidebar-wrapper">
-  <div id="sidebar" class="sidebar"></div>
+  <div id="sidebar-placeholder"></div> <!-- Sidebar burada yüklenecek -->
 
-  <div class="main-content">
+  <main class="main-content" style="padding: 2rem;">
     <h2 class="mb-4">Kullanıcı Listesi</h2>
 
     <div class="mb-3">
@@ -66,8 +42,7 @@
         <ul class="pagination justify-content-center flex-wrap" id="pagination"></ul>
       </nav>
     </div>
-  </div>
-</div>
+  </main>
 
 <script>
   let users = [];
@@ -90,7 +65,7 @@
     );
 
     const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
-    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage > totalPages) currentPage = totalPages || 1;
 
     const start = (currentPage - 1) * usersPerPage;
     const end = start + usersPerPage;
@@ -103,13 +78,13 @@
       const row = document.createElement("tr");
 
       row.innerHTML = `
-  <td>${user.name}</td>
-  <td>${user.username}</td>
-  <td>${user.email}</td>
-  <td>
-    <a class="btn btn-sm btn-outline-primary" href="/user_details.html?username=${user.username}">Detay</a>
-  </td>
-`;
+        <td>${user.name}</td>
+        <td>${user.username}</td>
+        <td>${user.email}</td>
+        <td>
+          <a class="btn btn-sm btn-outline-primary" href="/user_details.html?username=${user.username}">Detay</a>
+        </td>
+      `;
 
       tableBody.appendChild(row);
     });
@@ -118,56 +93,53 @@
   }
 
   function renderPagination(totalItems) {
-  const pageCount = Math.ceil(totalItems / usersPerPage);
-  const pagination = document.getElementById("pagination");
-  pagination.innerHTML = "";
+    const pageCount = Math.ceil(totalItems / usersPerPage);
+    const pagination = document.getElementById("pagination");
+    pagination.innerHTML = "";
 
-  let startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
-  let endPage = Math.min(pageCount, startPage + maxPageButtons - 1);
+    let startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
+    let endPage = Math.min(pageCount, startPage + maxPageButtons - 1);
 
-  if (endPage - startPage < maxPageButtons - 1 && startPage > 1) {
-    startPage = Math.max(1, endPage - maxPageButtons + 1);
+    if (endPage - startPage < maxPageButtons - 1 && startPage > 1) {
+      startPage = Math.max(1, endPage - maxPageButtons + 1);
+    }
+
+    if (currentPage > 1) {
+      const firstBtn = document.createElement("li");
+      firstBtn.className = "page-item";
+      firstBtn.innerHTML = `<a class="page-link" href="#">⏮</a>`;
+      firstBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        currentPage = 1;
+        renderTable();
+      });
+      pagination.appendChild(firstBtn);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      const li = document.createElement("li");
+      li.className = `page-item ${i === currentPage ? "active" : ""}`;
+      li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+      li.addEventListener("click", (e) => {
+        e.preventDefault();
+        currentPage = i;
+        renderTable();
+      });
+      pagination.appendChild(li);
+    }
+
+    if (currentPage < pageCount) {
+      const lastBtn = document.createElement("li");
+      lastBtn.className = "page-item";
+      lastBtn.innerHTML = `<a class="page-link" href="#">⏭</a>`;
+      lastBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        currentPage = pageCount;
+        renderTable();
+      });
+      pagination.appendChild(lastBtn);
+    }
   }
-
-  // ⏮ İlk Sayfa Butonu
-  if (currentPage > 1) {
-    const firstBtn = document.createElement("li");
-    firstBtn.className = "page-item";
-    firstBtn.innerHTML = `<a class="page-link" href="#">⏮</a>`;
-    firstBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      currentPage = 1;
-      renderTable();
-    });
-    pagination.appendChild(firstBtn);
-  }
-
-  for (let i = startPage; i <= endPage; i++) {
-    const li = document.createElement("li");
-    li.className = `page-item ${i === currentPage ? "active" : ""}`;
-    li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
-    li.addEventListener("click", (e) => {
-      e.preventDefault();
-      currentPage = i;
-      renderTable();
-    });
-    pagination.appendChild(li);
-  }
-
-  // ⏭ Son Sayfa Butonu
-  if (currentPage < pageCount) {
-    const lastBtn = document.createElement("li");
-    lastBtn.className = "page-item";
-    lastBtn.innerHTML = `<a class="page-link" href="#">⏭</a>`;
-    lastBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      currentPage = pageCount;
-      renderTable();
-    });
-    pagination.appendChild(lastBtn);
-  }
-}
-
 
   document.getElementById("searchInput").addEventListener("input", () => {
     currentPage = 1;
