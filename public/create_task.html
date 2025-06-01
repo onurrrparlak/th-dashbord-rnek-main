@@ -23,7 +23,10 @@
       <select class="form-select mt-3" id="taskType">
         <option value="activate_user">🟢 Kullanıcıyı Aktive Et</option>
         <option value="deactivate_user">🛑 Kullanıcıyı Deaktife Et</option>
-        <option value="send_email">📧 E-posta Gönder (yakında)</option>
+        
+       <option value="reset_password">🔐 Kullanıcı Şifresini Sıfırla</option>
+
+
       </select>
       <button class="btn btn-primary mt-3" onclick="redirectToTask()">İlerle</button>
     </div>
@@ -77,6 +80,9 @@
       } 
       else if (selected === "activate_user") {
         window.location.href = "/tasks/kullanici_aktive.html";
+      }
+       else if (selected === "reset_password") {
+        window.location.href = "/tasks/reset_password.html";
       }
       else {
         alert("Bu görev tipi henüz desteklenmiyor.");

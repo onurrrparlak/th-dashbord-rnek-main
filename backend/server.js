@@ -7,43 +7,84 @@ const ActiveDirectory = require('activedirectory2');
 const { v4: uuidv4 } = require('uuid');
 const ldap = require('ldapjs');
 const fs = require('fs');
-const LOG_FILE = path.join(__dirname, '..', 'public', 'logs', 'task_logs.json');
-
 
 const { Change, Attribute } = require('ldapjs');
-
-
 const app = express();
 const PORT = 3000;
+const LOG_FILE = path.join(__dirname, '..', 'public', 'logs', 'task_logs.json');
+const caCert = fs.readFileSync(path.join(__dirname, 'certs', 'test-THTEST-CA.cer'));
 
-
+// AD Config
 const config = {
   url: process.env.AD_URL,
   baseDN: process.env.AD_BASE_DN,
   username: process.env.AD_USERNAME,
-  password: process.env.AD_PASSWORD
+  password: process.env.AD_PASSWORD,
+  tlsOptions: {
+    ca: [caCert],
+    rejectUnauthorized: false
+  }
 };
 
+console.log("📄 CA sertifikası yüklendi, boyutu:", caCert.length, "byte");
+console.log("🔒 İlk satır:", caCert.toString().split('\n')[0]);
 
 const ad = new ActiveDirectory(config);
-
 let cachedUsers = null;
-let logs = [];
-
 let lastFetchTime = 0;
-const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 dakika
-
+const CACHE_DURATION_MS = 5 * 60 * 1000;
+let logs = [];
+let scheduledTasks = [];
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+// Global error catchers
+process.on('uncaughtException', (err) => {
+  console.error('[UNCAUGHT EXCEPTION]', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[UNHANDLED PROMISE REJECTION]', reason);
+});
 
+// LDAP Client creation
+function createLdapClient() {
+  const client = ldap.createClient({
+    url: process.env.AD_URL,
+    tlsOptions: {
+      ca: [caCert],
+      rejectUnauthorized: false
+    }
+  });
 
+  client.on('error', (err) => {
+    console.error(`[LDAP ERROR] ${new Date().toISOString()} - ${err.message}`);
+  });
+
+  return client;
+}
+
+// Cache refresh for logs
+if (fs.existsSync(LOG_FILE)) {
+  try {
+    logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
+  } catch (err) {
+    console.error('Log dosyası okunamadı:', err);
+  }
+}
+
+// Add log function
+function addLog(entry) {
+  logs.push(entry);
+  fs.writeFile(LOG_FILE, JSON.stringify(logs, null, 2), err => {
+    if (err) console.error('Log dosyası yazılamadı:', err);
+  });
+}
+
+// User Data Fetch - Cache mechanism
 app.get('/users', (req, res) => {
   const now = Date.now();
-
-  // Eğer cache taze ise, bellektekini gönder
   if (cachedUsers && (now - lastFetchTime < CACHE_DURATION_MS)) {
     console.log("⚡ Bellekten kullanıcı verisi gönderildi");
     return res.json(cachedUsers);
@@ -52,70 +93,58 @@ app.get('/users', (req, res) => {
   const opts = {
     filter: '(&(objectCategory=person)(objectClass=user))',
     scope: 'sub',
-    paged: true,
     attributes: ['displayName', 'cn', 'sAMAccountName', 'mail', 'userAccountControl']
   };
 
-  ad.find(opts, (err, results) => {
-    if (err) {
-      console.error('❌ AD kullanıcı çekme hatası:', err);
-      return res.status(500).json({ error: 'AD hatası' });
-    }
+ ad.find(opts, (err, results) => {
+  if (err || !results || !results.users || !Array.isArray(results.users)) {
+    console.error('❌ AD kullanıcı çekme hatası:', err || 'boş sonuç');
+    return res.status(500).json({ error: 'AD hatası' });
+  }
 
-    const users = results.users || [];
-    console.log(`📥 AD'den gelen toplam kullanıcı sayısı: ${users.length}`);
+  const users = results.users.sort((a, b) => (a.displayName || a.cn).localeCompare(b.displayName || b.cn));
+  cachedUsers = users.map(user => ({
+    name: user.displayName || user.cn || 'İsimsiz',
+    username: user.sAMAccountName || '',
+    fullName: user.cn || '',
+    email: user.mail || '',
+    disabled: (user.userAccountControl & 2) === 2
+  }));
 
-    users.sort((a, b) => {
-      const nameA = (a.displayName || a.cn || '').toLowerCase();
-      const nameB = (b.displayName || b.cn || '').toLowerCase();
-      return nameA.localeCompare(nameB);
-    });
+  if (!results || !results.users || results.users.length === 0) {
+  return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+}
 
-    const cleaned = users.map(user => ({
-      name: user.displayName || user.cn || 'İsimsiz',
-      username: user.sAMAccountName || '',
-      fullName: user.cn || '',
-      email: user.mail || '',
-      disabled: (user.userAccountControl & 2) === 2
-    }));
 
-    // Cache'i güncelle
-    cachedUsers = cleaned;
-    lastFetchTime = now;
-
-    return res.json(cleaned);
-  });
+  lastFetchTime = now;
+  res.json(cachedUsers);
 });
 
-// Kullanıcı cache'ini temizle ve AD'den yeniden çek
+});
+
+// Clear the user cache
 app.post('/api/refresh-users-cache', (req, res) => {
   cachedUsers = null;
   lastFetchTime = 0;
-  res.json({ success: true, message: 'Kullanıcı cache\'i temizlendi. Bir sonraki /users isteğinde güncel veriler çekilecek.' });
+  res.json({ success: true, message: 'Kullanıcı cache\'i temizlendi.' });
 });
 
-
-
+// User Detail Fetch
 app.get('/users/:username', (req, res) => {
   const username = req.params.username;
-
   const opts = {
     filter: `(&(objectCategory=person)(objectClass=user)(sAMAccountName=${username}))`,
     attributes: ['displayName', 'cn', 'sAMAccountName', 'mail', 'title', 'department', 'telephoneNumber']
   };
 
   ad.find(opts, (err, results) => {
-    if (err) {
+    if (err || !results || !results.users || !results.users.length) {
       console.error('❌ AD kullanıcı detayı hatası:', err);
-      return res.status(500).json({ error: 'AD hatası' });
-    }
-
-    const user = results.users && results.users[0];
-    if (!user) {
       return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
     }
 
-    const cleaned = {
+    const user = results.users[0];
+    res.json({
       dn: user.dn,
       name: user.displayName || user.cn || 'İsimsiz',
       username: user.sAMAccountName || '',
@@ -123,276 +152,114 @@ app.get('/users/:username', (req, res) => {
       title: user.title || '',
       department: user.department || '',
       phone: user.telephoneNumber || ''
-    };
-
-    return res.json(cleaned);
+    });
   });
 });
 
-
-let scheduledTasks = [];
-
-try {
-  if (fs.existsSync(LOG_FILE)) {
-    const data = fs.readFileSync(LOG_FILE, 'utf8');
-    logs = JSON.parse(data);
-  }
-} catch (err) {
-  console.error('Log dosyası okunamadı:', err);
-}
-
-// Log ekleme fonksiyonu
-function addLog(entry) {
-  logs.push(entry);
-  // Dosyaya kaydet
-  fs.writeFile(LOG_FILE, JSON.stringify(logs, null, 2), err => {
-    if (err) console.error('Log dosyası yazılamadı:', err);
-  });
-}
-
-// API logları JSON'dan döndürür
-app.get('/api/task-logs', (req, res) => {
-  res.json(logs);
-});
-
-
-
+// Task Logs & Active Tasks
+app.get('/api/task-logs', (req, res) => res.json(logs));
 app.get('/api/active-tasks', (req, res) => {
   const now = Date.now();
-
-  const upcoming = scheduledTasks.filter(task => {
-    const runAt = new Date(task.runAt).getTime();
-    return runAt > now;
-  });
-
-  res.json(upcoming);
+  res.json(scheduledTasks.filter(task => new Date(task.runAt).getTime() > now));
 });
 
-
-
-
+// Schedule Task for Reset Password, Activate/Deactivate User
 app.post('/api/schedule-task', (req, res) => {
   const { type, username, runAt, description, label } = req.body;
 
-  if (!['activate_user', 'deactivate_user'].includes(type)) {
+  if (!['activate_user', 'deactivate_user', 'reset_password'].includes(type)) {
     return res.status(400).json({ error: 'Geçersiz görev tipi.' });
   }
 
   const date = new Date(runAt);
   const id = uuidv4();
 
- const job = schedule.scheduleJob(date, () => {
-  getUserDN(username, (err, dn) => {
-    if (err) {
-      addLog({ username, type, status: 'error', timestamp: new Date(), message: err.message, label });
-      return;
-    }
+  schedule.scheduleJob(date, () => {
+    if (type === 'reset_password') {
+      console.log(`[${new Date().toISOString()}] Görev tetiklendi: reset_password - Kullanıcı: ${username}`);
 
-    if (type === 'activate_user') {
-      enableUserDN(dn, (err) => {
+      getUserFullName(username, (err, user) => {
         if (err) {
-          addLog({ username, type, status: 'error', timestamp: new Date(), message: err.message, label });
-        } else {
-          addLog({ username, type, status: 'success', timestamp: new Date(), message: 'Aktif edildi', label });
+          console.error(`[getUserFullName HATA]: ${err.message}`);
+          return addLog({ username, type, status: 'error', timestamp: new Date(), message: err.message, label });
         }
+
+        const newPassword = generatePassword(user.givenName, user.surname);
+        resetUserPassword(user.dn, newPassword, (err) => {
+          if (err) {
+            return addLog({ username, type, status: 'error', timestamp: new Date(), message: err.message, label });
+          }
+          addLog({ username, type, status: 'success', timestamp: new Date(), message: `Şifre sıfırlandı: ${newPassword}`, label });
+        });
       });
-    } else if (type === 'deactivate_user') {
-     disableUserDN(dn, (err) => {
-        if (err) {
-          addLog({ username, type, status: 'error', timestamp: new Date(), message: err.message, label });
-        } else {
-          addLog({ username, type, status: 'success', timestamp: new Date(), message: 'Deaktif edildi', label });
-        }
+
+    } else {
+      getUserDN(username, (err, dn) => {
+        if (err) return addLog({ username, type, status: 'error', timestamp: new Date(), message: err.message, label });
+
+        const action = type === 'activate_user' ? enableUserDN : disableUserDN;
+        const successMsg = type === 'activate_user' ? 'Aktif edildi' : 'Deaktif edildi';
+
+        action(dn, (err) => {
+          if (err) return addLog({ username, type, status: 'error', timestamp: new Date(), message: err.message, label });
+          addLog({ username, type, status: 'success', timestamp: new Date(), message: successMsg, label });
+        });
       });
     }
   });
-});
 
-
-  scheduledTasks.push({
-    id,
-    username,
-    type,
-    runAt,
-    description: description || `${type} görevi`,
-    label: label || username
-  });
-
+  scheduledTasks.push({ id, username, type, runAt, description: description || `${type} görevi`, label: label || username });
   res.json({ success: true });
 });
 
-app.get('/api/task-logs', (req, res) => {
-  res.json(logs);
-});
-
+// Utility Functions
 function getUserDN(username, callback) {
   const opts = {
     filter: `(&(objectCategory=person)(objectClass=user)(sAMAccountName=${username}))`,
     attributes: ['distinguishedName']
   };
   ad.find(opts, (err, results) => {
-    if (err) return callback(err);
-    if (!results.users || results.users.length === 0) return callback(new Error('Kullanıcı bulunamadı'));
+    if (err || !results.users?.length) return callback(new Error('Kullanıcı bulunamadı'));
+    callback(null, results.users[0].distinguishedName || results.users[0].dn);
+  });
+}
 
+function getUserFullName(username, callback) {
+  const opts = {
+    filter: `(&(objectCategory=person)(objectClass=user)(sAMAccountName=${username}))`,
+    attributes: ['givenName', 'sn', 'distinguishedName']
+  };
+  ad.find(opts, (err, results) => {
+    if (err || !results.users?.length) return callback(new Error('Kullanıcı bulunamadı'));
     const user = results.users[0];
-    const dn = user.distinguishedName || user.dn;
-
-    if (!dn) return callback(new Error('DN bilgisi yok'));
-
-    console.log('Bulunan DN:', dn);
-    callback(null, dn);
+    if (!user.givenName || !user.sn || !user.distinguishedName) return callback(new Error('Eksik kullanıcı bilgisi'));
+    callback(null, { givenName: user.givenName, surname: user.sn, dn: user.distinguishedName });
   });
 }
 
-
-function disableUserDN(dn, callback) {
-  const client = ldap.createClient({
-    url: process.env.AD_URL
-  });
-
+function resetUserPassword(dn, newPassword, callback) {
+  const client = createLdapClient();
   client.bind(process.env.AD_USERNAME, process.env.AD_PASSWORD, (err) => {
     if (err) return callback(err);
 
-    // Önce userAccountControl al
-    const opts = {
-      scope: 'base',
-      attributes: ['userAccountControl', 'cn']
-    };
+    const pwdUnicode = `"${newPassword}"`;
+    const buf = Buffer.from(pwdUnicode, 'utf16le');
+    const change = new Change({
+      operation: 'replace',
+      modification: new Attribute({ type: 'unicodePwd', values: [buf] })
+    });
 
-    client.search(dn, opts, (err, res) => {
-      if (err) {
-        client.unbind();
-        return callback(err);
-      }
-
-      let userAccountControl;
-      let currentCN;
-
-      res.on('searchEntry', (entry) => {
-        userAccountControl = entry.attributes.find(attr => attr.type === 'userAccountControl')?.values[0];
-        currentCN = entry.attributes.find(attr => attr.type === 'cn')?.values[0];
-      });
-
-      res.on('error', (err) => {
-        client.unbind();
-        callback(err);
-      });
-
-      res.on('end', () => {
-        if (userAccountControl === undefined) {
-          client.unbind();
-          return callback(new Error('userAccountControl bulunamadı'));
-        }
-        if (!currentCN) {
-          client.unbind();
-          return callback(new Error('cn bilgisi bulunamadı'));
-        }
-
-        let uac = parseInt(userAccountControl);
-        uac = uac | 2; // Disable flag'i ekle
-
-        // userAccountControl değişikliğini uygula
-        const change = new Change({
-          operation: 'replace',
-          modification: new Attribute({
-            type: 'userAccountControl',
-            values: [uac.toString()]
-          })
-        });
-
-        client.modify(dn, change, (err) => {
-          if (err) {
-            client.unbind();
-            return callback(err);
-          }
-
-          // RDN değişikliği için yeni RDN hazırla
-          let newCN = currentCN.startsWith('v-') ? currentCN : 'v-' + currentCN;
-
-          // DN içinden RDN çıkar (örn: CN=John Doe,... -> CN=John Doe)
-          const rdn = `CN=${currentCN}`;
-          const newRdn = `CN=${newCN}`;
-
-          client.modifyDN(dn, newRdn, (err) => {
-            client.unbind();
-            if (err) return callback(err);
-            callback(null);
-          });
-        });
-      });
+    client.modify(dn, change, (err) => {
+      client.unbind();
+      callback(err || null);
     });
   });
 }
 
-
-
-function enableUserDN(dn, callback) {
-  const client = ldap.createClient({
-    url: process.env.AD_URL
-  });
-
-  client.bind(process.env.AD_USERNAME, process.env.AD_PASSWORD, (err) => {
-    if (err) {
-      return callback(err);
-    }
-
-    const opts = {
-      scope: 'base',
-      attributes: ['userAccountControl']
-    };
-
-    client.search(dn, opts, (err, res) => {
-      if (err) {
-        client.unbind();
-        return callback(err);
-      }
-
-      let userAccountControl;
-
-      res.on('searchEntry', (entry) => {
-        userAccountControl = entry.attributes.find(attr => attr.type === 'userAccountControl')?.values[0];
-      });
-
-      res.on('error', (err) => {
-        client.unbind();
-        callback(err);
-      });
-
-      res.on('end', () => {
-        if (userAccountControl === undefined) {
-          client.unbind();
-          return callback(new Error('userAccountControl bulunamadı'));
-        }
-
-        let uac = parseInt(userAccountControl);
-        uac = uac & (~2);  // Disable flag'i kaldır
-
-        const mod = new Attribute({
-          type: 'userAccountControl',
-          values: [uac.toString()]
-        });
-
-        const change = new Change({
-          operation: 'replace',
-          modification: mod
-        });
-
-        client.modify(dn, change, (err) => {
-          client.unbind();
-          if (err) {
-            return callback(err);
-          }
-          callback(null);
-        });
-      });
-    });
-  });
+function generatePassword(givenName, surname) {
+  return `${givenName.charAt(0).toUpperCase()}${surname.charAt(0).toLowerCase()}1q2w3e!!`;
 }
-
-
-
-
 
 app.listen(PORT, () => {
-  console.log(`Sunucu çalışıyor: http://localhost:${PORT}`);
+  console.log(`🚀 Sunucu çalışıyor: http://localhost:${PORT}`);
 });
