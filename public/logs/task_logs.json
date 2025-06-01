@@ -46,5 +46,37 @@
     "timestamp": "2025-06-01T15:53:00.058Z",
     "message": "Şifre sıfırlandı: Tu1q2w3e!!",
     "label": "Test User12 (testuser12)"
+  },
+  {
+    "username": "testuser12",
+    "type": "reset_password",
+    "status": "error",
+    "timestamp": "2025-06-01T21:15:00.015Z",
+    "message": "Kullanıcı bulunamadı",
+    "label": "Test User12 (testuser12)"
+  },
+  {
+    "username": "testuser12",
+    "type": "reset_password",
+    "status": "success",
+    "timestamp": "2025-06-01T21:15:00.064Z",
+    "message": "Şifre sıfırlandı: Tu1q2w3e!!",
+    "label": "Test User12 (testuser12)"
+  },
+  {
+    "username": "testuser15",
+    "type": "reset_password",
+    "status": "error",
+    "timestamp": "02.06.2025 00:19:00",
+    "message": "Kullanıcı bulunamadı",
+    "label": "Test User15 (testuser15)"
+  },
+  {
+    "username": "testuser15",
+    "type": "reset_password",
+    "status": "success",
+    "timestamp": "2025-06-01T21:19:00.062Z",
+    "message": "Şifre sıfırlandı: Tu1q2w3e!!",
+    "label": "Test User15 (testuser15)"
   }
 ]
