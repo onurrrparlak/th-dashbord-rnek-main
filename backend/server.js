@@ -20,6 +20,7 @@ const config = {
   baseDN: process.env.AD_BASE_DN,
   username: process.env.AD_USERNAME,
   password: process.env.AD_PASSWORD,
+  reconnect: true,
    timeout: 10000,
   tlsOptions: {
     ca: [caCert],
@@ -182,65 +183,101 @@ app.post('/api/schedule-task', (req, res) => {
   const date = new Date(runAt);
   const id = uuidv4();
 
-  schedule.scheduleJob(date, () => {
-  if (type === 'reset_password') {
-    console.log(`[${new Date().toISOString()}] Görev tetiklendi: reset_password - Kullanıcı: ${username}`);
+schedule.scheduleJob(date, () => {
+  console.log(`[${new Date().toISOString()}] Görev tetiklendi: ${type} - Kullanıcı: ${username}`);
 
+  if (type === 'reset_password') {
     getUserFullName(username, (err, user) => {
       if (err) {
-        console.error(`[getUserFullName HATA]: ${err.message}`);
+        console.error(`[${new Date().toISOString()}] getUserFullName HATA: ${err.message} - Kullanıcı: ${username}`);
         addLog({
           username,
           type,
           status: 'error',
-          timestamp: new Date().toLocaleString('tr-TR'),
+          timestamp: new Date().toISOString(),
           message: err.message,
           label
         });
-        return; // ❗ Erken çık — diğer işlemleri yapma
+        return;
       }
 
+      console.log(`[${new Date().toISOString()}] Kullanıcı bulundu: ${username} - İsim: ${user.givenName} ${user.surname}`);
+
       const newPassword = generatePassword(user.givenName, user.surname);
+      console.log(`[${new Date().toISOString()}] Yeni şifre oluşturuldu: ${newPassword} - Kullanıcı: ${username}`);
 
       resetUserPassword(user.dn, newPassword, (err) => {
         if (err) {
-          console.error(`[resetUserPassword HATA]: ${err.message}`);
+          console.error(`[${new Date().toISOString()}] resetUserPassword HATA: ${err.message} - Kullanıcı: ${username}`);
           return addLog({
             username,
             type,
             status: 'error',
-            timestamp: new Date(),
+            timestamp: new Date().toISOString(),
             message: err.message,
             label
           });
         }
 
+        console.log(`[${new Date().toISOString()}] Şifre sıfırlama başarılı - Kullanıcı: ${username}`);
+
         addLog({
           username,
           type,
           status: 'success',
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
           message: `Şifre sıfırlandı: ${newPassword}`,
           label
         });
       });
     });
-
   } else {
-    // activate/deactivate_user işlemleri aynı kalabilir
     getUserDN(username, (err, dn) => {
-      if (err) return addLog({ username, type, status: 'error', timestamp: new Date(), message: err.message, label });
+      if (err) {
+        console.error(`[${new Date().toISOString()}] getUserDN HATA: ${err.message} - Kullanıcı: ${username}`);
+        return addLog({
+          username,
+          type,
+          status: 'error',
+          timestamp: new Date().toISOString(),
+          message: err.message,
+          label
+        });
+      }
+
+      console.log(`[${new Date().toISOString()}] Kullanıcı DN bulundu: ${dn} - Kullanıcı: ${username}`);
 
       const action = type === 'activate_user' ? enableUserDN : disableUserDN;
       const successMsg = type === 'activate_user' ? 'Aktif edildi' : 'Deaktif edildi';
 
       action(dn, (err) => {
-        if (err) return addLog({ username, type, status: 'error', timestamp: new Date(), message: err.message, label });
-        addLog({ username, type, status: 'success', timestamp: new Date(), message: successMsg, label });
+        if (err) {
+          console.error(`[${new Date().toISOString()}] ${type} HATA: ${err.message} - Kullanıcı: ${username}`);
+          return addLog({
+            username,
+            type,
+            status: 'error',
+            timestamp: new Date().toISOString(),
+            message: err.message,
+            label
+          });
+        }
+
+        console.log(`[${new Date().toISOString()}] ${type} başarılı - Kullanıcı: ${username}`);
+
+        addLog({
+          username,
+          type,
+          status: 'success',
+          timestamp: new Date().toISOString(),
+          message: successMsg,
+          label
+        });
       });
     });
   }
 });
+
 
 
   scheduledTasks.push({ id, username, type, runAt, description: description || `${type} görevi`, label: label || username });
@@ -249,28 +286,51 @@ app.post('/api/schedule-task', (req, res) => {
 
 // Yardımcı Fonksiyonlar
 function getUserDN(username, callback) {
+  let called = false;
+
   const opts = {
     filter: `(&(objectCategory=person)(objectClass=user)(sAMAccountName=${username}))`,
     attributes: ['distinguishedName']
   };
+
   ad.find(opts, (err, results) => {
-    if (err || !results.users?.length) return callback(new Error('Kullanıcı bulunamadı'));
+    if (called) return;  // Eğer callback zaten çağrıldıysa bir daha çağırma
+    called = true;
+
+    if (err || !results.users?.length) {
+      return callback(new Error('Kullanıcı bulunamadı'));
+    }
+
     callback(null, results.users[0].distinguishedName || results.users[0].dn);
   });
 }
 
+
 function getUserFullName(username, callback) {
+  console.log(`[LDAP] getUserFullName çağrıldı: ${username}`);
   const opts = {
     filter: `(&(objectCategory=person)(objectClass=user)(sAMAccountName=${username}))`,
     attributes: ['givenName', 'sn', 'distinguishedName']
   };
   ad.find(opts, (err, results) => {
-    if (err || !results.users?.length) return callback(new Error('Kullanıcı bulunamadı'));
+    if (err) {
+      console.error(`[LDAP] Hata: ${err.message}`);
+      return callback(new Error('Kullanıcı bulunamadı'));
+    }
+    if (!results.users?.length) {
+      console.warn(`[LDAP] Kullanıcı bulunamadı: ${username}`);
+      return callback(new Error('Kullanıcı bulunamadı'));
+    }
     const user = results.users[0];
-    if (!user.givenName || !user.sn || !user.distinguishedName) return callback(new Error('Eksik kullanıcı bilgisi'));
+    if (!user.givenName || !user.sn || !user.distinguishedName) {
+      console.warn(`[LDAP] Eksik kullanıcı bilgisi: ${username}`);
+      return callback(new Error('Eksik kullanıcı bilgisi'));
+    }
+    console.log(`[LDAP] Kullanıcı bulundu: ${username}`);
     callback(null, { givenName: user.givenName, surname: user.sn, dn: user.distinguishedName });
   });
 }
+
 
 function resetUserPassword(dn, newPassword, callback) {
   const client = createLdapClient();

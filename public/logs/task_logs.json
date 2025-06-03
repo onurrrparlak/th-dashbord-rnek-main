@@ -78,5 +78,109 @@
     "timestamp": "2025-06-01T21:19:00.062Z",
     "message": "Şifre sıfırlandı: Tu1q2w3e!!",
     "label": "Test User15 (testuser15)"
+  },
+  {
+    "username": "testuser10",
+    "type": "reset_password",
+    "status": "error",
+    "timestamp": "03.06.2025 00:08:00",
+    "message": "Kullanıcı bulunamadı",
+    "label": "Test User10 (testuser10)"
+  },
+  {
+    "username": "testuser14",
+    "type": "deactivate_user",
+    "status": "error",
+    "timestamp": "2025-06-02T21:08:00.024Z",
+    "message": "Kullanıcı bulunamadı",
+    "label": "Test User14 (testuser14)"
+  },
+  {
+    "username": "testuser14",
+    "type": "deactivate_user",
+    "status": "success",
+    "timestamp": "2025-06-02T21:08:00.040Z",
+    "message": "Deaktif edildi",
+    "label": "Test User14 (testuser14)"
+  },
+  {
+    "username": "testuser10",
+    "type": "reset_password",
+    "status": "success",
+    "timestamp": "2025-06-02T21:08:00.065Z",
+    "message": "Şifre sıfırlandı: Tu1q2w3e!!",
+    "label": "Test User10 (testuser10)"
+  },
+  {
+    "username": "testuser16",
+    "type": "deactivate_user",
+    "status": "error",
+    "timestamp": "2025-06-03T09:00:00.023Z",
+    "message": "Kullanıcı bulunamadı",
+    "label": "Test User16 (testuser16)"
+  },
+  {
+    "username": "testuser16",
+    "type": "deactivate_user",
+    "status": "success",
+    "timestamp": "2025-06-03T09:00:00.039Z",
+    "message": "Deaktif edildi",
+    "label": "Test User16 (testuser16)"
+  },
+  {
+    "username": "testuser17",
+    "type": "deactivate_user",
+    "status": "error",
+    "timestamp": "2025-06-03T09:04:00.030Z",
+    "message": "Kullanıcı bulunamadı",
+    "label": "Test User17 (testuser17)"
+  },
+  {
+    "username": "testuser17",
+    "type": "deactivate_user",
+    "status": "success",
+    "timestamp": "2025-06-03T09:04:00.044Z",
+    "message": "Deaktif edildi",
+    "label": "Test User17 (testuser17)"
+  },
+  {
+    "username": "testuser13",
+    "type": "deactivate_user",
+    "status": "success",
+    "timestamp": "2025-06-03T09:09:00.035Z",
+    "message": "Deaktif edildi",
+    "label": "Test User13 (testuser13)"
+  },
+  {
+    "username": "testuser12",
+    "type": "reset_password",
+    "status": "error",
+    "timestamp": "2025-06-03T09:10:00.032Z",
+    "message": "Kullanıcı bulunamadı",
+    "label": "Test User12 (testuser12)"
+  },
+  {
+    "username": "testuser10",
+    "type": "deactivate_user",
+    "status": "success",
+    "timestamp": "2025-06-03T09:10:00.044Z",
+    "message": "Deaktif edildi",
+    "label": "Test User10 (testuser10)"
+  },
+  {
+    "username": "testuser1",
+    "type": "deactivate_user",
+    "status": "success",
+    "timestamp": "2025-06-03T09:10:00.046Z",
+    "message": "Deaktif edildi",
+    "label": "v-Test User1 (testuser1)"
+  },
+  {
+    "username": "testuser12",
+    "type": "reset_password",
+    "status": "success",
+    "timestamp": "2025-06-03T09:10:00.073Z",
+    "message": "Şifre sıfırlandı: Tu1q2w3e!!",
+    "label": "Test User12 (testuser12)"
   }
 ]
