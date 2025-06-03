@@ -16,6 +16,7 @@
 
   <main class="main-content">
     <h2>Görev Geçmişi</h2>
+
     <table class="table table-striped mt-4">
       <thead>
         <tr>
@@ -28,20 +29,40 @@
       </thead>
       <tbody id="logTableBody"></tbody>
     </table>
+
+    <!-- Pagination -->
+    <nav>
+      <ul class="pagination justify-content-center" id="pagination"></ul>
+    </nav>
   </main>
 
   <script>
+    let logs = [];
+    let currentPage = 1;
+    const logsPerPage = 15;
+    const maxPageButtons = 7;
+
     async function loadLogs() {
       const res = await fetch('/api/task-logs');
       if (!res.ok) {
         alert('Loglar yüklenemedi.');
         return;
       }
-      const logs = await res.json();
+      logs = await res.json();
+      logs.reverse(); // En yeni ilk gösterilecek
+      renderTable();
+      renderPagination();
+    }
+
+    function renderTable() {
       const tbody = document.getElementById('logTableBody');
       tbody.innerHTML = '';
 
-      logs.reverse().forEach(log => {
+      const start = (currentPage - 1) * logsPerPage;
+      const end = start + logsPerPage;
+      const paginatedLogs = logs.slice(start, end);
+
+      paginatedLogs.forEach(log => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${log.username || '-'}</td>
@@ -52,6 +73,67 @@
         `;
         tbody.appendChild(tr);
       });
+
+      if (logs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center">Görev bulunamadı.</td></tr>`;
+      }
+    }
+
+    function renderPagination() {
+      const pagination = document.getElementById('pagination');
+      pagination.innerHTML = '';
+
+      const pageCount = Math.ceil(logs.length / logsPerPage);
+      if (pageCount <= 1) return;
+
+      let startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
+      let endPage = Math.min(pageCount, startPage + maxPageButtons - 1);
+
+      if (endPage - startPage < maxPageButtons - 1) {
+        startPage = Math.max(1, endPage - maxPageButtons + 1);
+      }
+
+      // İlk sayfa butonu
+      if (currentPage > 1) {
+        const firstBtn = document.createElement('li');
+        firstBtn.className = 'page-item';
+        firstBtn.innerHTML = `<a class="page-link" href="#">⏮</a>`;
+        firstBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          currentPage = 1;
+          renderTable();
+          renderPagination();
+        });
+        pagination.appendChild(firstBtn);
+      }
+
+      // Sayfa numaraları
+      for (let i = startPage; i <= endPage; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+        li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+        li.addEventListener('click', (e) => {
+          e.preventDefault();
+          currentPage = i;
+          renderTable();
+          renderPagination();
+        });
+        pagination.appendChild(li);
+      }
+
+      // Son sayfa butonu
+      if (currentPage < pageCount) {
+        const lastBtn = document.createElement('li');
+        lastBtn.className = 'page-item';
+        lastBtn.innerHTML = `<a class="page-link" href="#">⏭</a>`;
+        lastBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          currentPage = pageCount;
+          renderTable();
+          renderPagination();
+        });
+        pagination.appendChild(lastBtn);
+      }
     }
 
     function formatTaskType(type) {

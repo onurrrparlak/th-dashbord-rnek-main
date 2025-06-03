@@ -182,5 +182,13 @@
     "timestamp": "2025-06-03T09:10:00.073Z",
     "message": "Şifre sıfırlandı: Tu1q2w3e!!",
     "label": "Test User12 (testuser12)"
+  },
+  {
+    "username": "testuser10",
+    "type": "activate_user",
+    "status": "success",
+    "timestamp": "2025-06-03T09:23:00.157Z",
+    "message": "Aktif edildi",
+    "label": "Test User10 (testuser10)"
   }
 ]
